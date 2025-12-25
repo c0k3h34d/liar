@@ -4,180 +4,128 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Liar</title>
-
     <link rel="manifest" href="manifest.json">
     <script>
-      if('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js');
-      }
+      if('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
     </script>
-
     <style>
-        body {
-            background-color: #0f172a;
-            color: #f8fafc;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            margin: 0;
-        }
-        .container {
-            max-width: 500px;
-            width: 100%;
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-        h1 {
-            text-align: center;
-            color: #94a3b8;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-        textarea {
-            width: 100%;
-            height: 100px;
-            background: #020617;
-            color: #10b981;
-            border: 1px solid #334155;
-            padding: 10px;
-            border-radius: 8px;
-            box-sizing: border-box;
-            resize: none;
-            font-size: 16px;
-        }
-        .file-input-wrapper {
-            margin-top: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        input[type="file"] {
-            font-size: 0.8em;
-            color: #94a3b8;
-        }
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        button {
-            flex: 1;
-            padding: 15px;
-            background: #334155;
-            color: #f8fafc;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-        button.save-btn { background: #1e40af; }
-        button:active { opacity: 0.8; }
-        
-        .status { margin-top: 15px; text-align: center; font-size: 0.8em; color: #64748b; }
-        .frame { margin-top: 15px; border: 1px solid #334155; padding: 10px; border-radius: 8px; position: relative; font-size: 0.85em; word-break: break-all; }
-        .label { position: absolute; top: -10px; left: 10px; background: #334155; padding: 2px 8px; font-size: 0.7em; border-radius: 4px; }
-        .local { border-color: #22c55e; color: #4ade80; }
-        .nist { border-color: #0ea5e9; color: #7dd3fc; }
-        
-        .vault-section { margin-top: 30px; border-top: 1px solid #334155; padding-top: 20px; width: 100%; }
-        .vault-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #10b981; font-size: 0.75em; }
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; padding: 15px; margin: 0; }
+        .container { max-width: 500px; width: 100%; background: #1e293b; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h1 { text-align: center; color: #94a3b8; font-size: 1.2em; text-transform: uppercase; margin-bottom: 10px; }
+        #canvas-container { width: 100%; margin-top: 10px; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; display: none; }
+        canvas { width: 100%; display: block; }
+        .btn-group { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        button { width: 100%; padding: 14px; background: #334155; color: #f8fafc; border: none; border-radius: 8px; font-weight: bold; text-transform: uppercase; cursor: pointer; }
+        .save-btn { background: #1e40af; }
+        .dl-btn { background: #059669; }
+        .status-box { margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 0.8em; text-align: center; font-weight: bold; background: #064e3b; color: #4ade80; border: 1px solid #22c55e; }
+        .vault-item { background: #0f172a; padding: 8px; border-radius: 6px; margin-top: 8px; border-left: 3px solid #10b981; font-size: 0.7em; }
     </style>
 </head>
 <body>
-
     <div class="container">
         <h1>Project Liar</h1>
         
-        <textarea id="textInput" placeholder="Enter text to anchor..."></textarea>
+        <input type="file" id="fileInput" accept="image/*" style="font-size: 0.8em; color: #94a3b8;">
         
-        <div class="file-input-wrapper">
-            <span style="font-size: 0.7em; color: #64748b;">OR UPLOAD FILE FOR PROOF:</span>
-            <input type="file" id="fileInput">
+        <div id="canvas-container">
+            <canvas id="editor"></canvas>
         </div>
-        
+
         <div class="btn-group">
-            <button onclick="authenticate()">Anchor Truth</button>
-            <button class="save-btn" onclick="saveToVault()">Save to Vault</button>
+            <button onclick="processAndStamp()">Generate Witness Stamp</button>
+            <button id="dlBtn" class="dl-btn" style="display:none;" onclick="downloadImage()">Download Stamped Clone</button>
+            <button id="saveBtn" class="save-btn" style="display:none;" onclick="saveToVault()">Store in Vault</button>
         </div>
 
-        <div class="status" id="status">Ready.</div>
-
-        <div class="frame local">
-            <div class="label">IDENTITY HASH</div>
-            <div id="local-out">Waiting...</div>
-        </div>
-
-        <div class="frame nist">
-            <div class="label">ATOMIC WITNESS</div>
-            <div id="nist-out">Waiting...</div>
-        </div>
-
-        <div class="vault-section">
-            <h1 style="font-size: 1em;">Evidence Vault</h1>
-            <div id="vault-list"></div>
-        </div>
+        <div id="verify-status" class="status-box" style="display:none;"></div>
+        <div id="vault-list" style="margin-top: 20px;"></div>
     </div>
 
     <script>
+        const canvas = document.getElementById('editor');
+        const ctx = canvas.getContext('2d');
+        const fileInput = document.getElementById('fileInput');
         let currentHash = "";
-        let currentTimestamp = "";
+        let originalImg = null;
+        let originalFileName = "evidence";
 
-        async function authenticate() {
-            const text = document.getElementById('textInput').value;
-            const file = document.getElementById('fileInput').files[0];
-            let data;
-
-            if (!text && !file) {
-                alert("Please provide text or a file.");
-                return;
+        fileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Capture the original name and remove the extension
+            originalFileName = file.name.replace(/\.[^/.]+$/, "");
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                originalImg = new Image();
+                originalImg.onload = function() {
+                    document.getElementById('canvas-container').style.display = 'block';
+                    canvas.width = originalImg.width;
+                    canvas.height = originalImg.height;
+                    ctx.drawImage(originalImg, 0, 0);
+                }
+                originalImg.src = event.target.result;
             }
+            reader.readAsDataURL(file);
+        };
 
-            document.getElementById('status').innerText = "CALCULATING PROOF...";
-
-            if (file) {
-                data = await file.arrayBuffer();
-            } else {
-                data = new TextEncoder().encode(text);
-            }
-
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        async function processAndStamp() {
+            if(!originalImg) return;
+            
+            const response = await fetch(originalImg.src);
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             currentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            currentTimestamp = new Date().toLocaleString();
+            const ts = new Date().toLocaleString();
 
-            document.getElementById('local-out').innerHTML = `HASH: ${currentHash}<br>DATE: ${currentTimestamp}`;
-            document.getElementById('nist-out').innerHTML = "BEACON: [VERIFIED]<br>ANCHOR: " + Math.random().toString(36).substring(7).toUpperCase();
-            document.getElementById('status').innerText = "TRUTH ANCHORED.";
+            ctx.drawImage(originalImg, 0, 0);
+            
+            // Visual Stamp Background
+            const barHeight = canvas.height * 0.12;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.fillRect(0, canvas.height - barHeight, canvas.width, barHeight);
+            
+            // Text Styles
+            ctx.fillStyle = "#10b981"; 
+            const fontSize = Math.floor(canvas.height * 0.03);
+            ctx.font = `bold ${fontSize}px Courier New`;
+            
+            ctx.fillText("PROJECT LIAR - WITNESS EVIDENCE", 20, canvas.height - (barHeight * 0.65));
+            ctx.font = `${fontSize * 0.6}px Courier New`;
+            ctx.fillText(`ORIGINAL HASH: ${currentHash}`, 20, canvas.height - (barHeight * 0.4));
+            ctx.fillText(`TIMESTAMP: ${ts}`, 20, canvas.height - (barHeight * 0.15));
+
+            document.getElementById('verify-status').style.display = 'block';
+            document.getElementById('verify-status').innerText = "WITNESS STAMP APPLIED";
+            document.getElementById('dlBtn').style.display = 'block';
+            document.getElementById('saveBtn').style.display = 'block';
+        }
+
+        function downloadImage() {
+            const link = document.createElement('a');
+            // Adding the tag to the file name as requested
+            link.download = `${originalFileName}_WITNESS_STAMPED.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
         }
 
         function saveToVault() {
-            if (!currentHash) return;
             const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
-            vault.unshift({ hash: currentHash, time: currentTimestamp });
-            localStorage.setItem('liarVault', JSON.stringify(vault.slice(0, 10))); // Keep last 10
+            vault.unshift({ hash: currentHash, time: new Date().toLocaleString(), name: originalFileName });
+            localStorage.setItem('liarVault', JSON.stringify(vault.slice(0, 10)));
             renderVault();
         }
 
         function renderVault() {
             const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
-            document.getElementById('vault-list').innerHTML = vault.map(item => `
-                <div class="vault-item">
-                    <strong>Time:</strong> ${item.time}<br>
-                    <strong>Hash:</strong> ${item.hash.substring(0,24)}...
-                </div>
-            `).join('');
+            document.getElementById('vault-list').innerHTML = '<h1 style="font-size:0.8em;">STAMPED HISTORY</h1>' + 
+                vault.map(item => `<div class="vault-item"><strong>${item.name}</strong><br>${item.time}<br><span style="color:#64748b; font-size:0.8em;">${item.hash.substring(0,32)}...</span></div>`).join('');
         }
-
-        // Load vault on startup
         renderVault();
     </script>
-
 </body>
 </html>
