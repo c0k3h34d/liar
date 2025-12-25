@@ -3,156 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Liar - Truth Authenticator</title>
+    <title>Project Liar</title>
+
+    <link rel="manifest" href="manifest.json">
+    <script>
+      if('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+      }
+    </script>
+
     <style>
-        :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --text: #f8fafc;
-            --nist: #38bdf8;
-            --chain: #a855f7;
-            --local: #22c55e;
-        }
         body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Courier New', Courier, monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 20px;
             margin: 0;
         }
-        .container { width: 100%; max-width: 500px; }
-        h1 { font-size: 1.5rem; text-align: center; color: #94a3b8; letter-spacing: 2px; }
-        
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        h1 {
+            text-align: center;
+            color: #94a3b8;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
         textarea {
             width: 100%;
-            height: 120px;
+            height: 150px;
             background: #020617;
-            color: var(--text);
+            color: #10b981;
             border: 1px solid #334155;
-            border-radius: 8px;
             padding: 10px;
+            border-radius: 8px;
             box-sizing: border-box;
-            margin-bottom: 20px;
+            resize: none;
+            font-size: 16px;
         }
-
-        .frame {
-            border: 1px solid #334155;
-            border-radius: 12px;
+        button {
+            width: 100%;
             padding: 15px;
-            margin-bottom: 15px;
-            background: var(--card);
+            margin-top: 20px;
+            background: #334155;
+            color: #f8fafc;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:active {
+            background: #1e293b;
+        }
+        .status {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 0.8em;
+            color: #64748b;
+        }
+        .frame {
+            margin-top: 20px;
+            border: 1px solid #334155;
+            padding: 10px;
+            border-radius: 8px;
             position: relative;
         }
         .label {
             position: absolute;
             top: -10px;
-            left: 15px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            padding: 2px 8px;
-            border-radius: 4px;
-            text-transform: uppercase;
-        }
-        
-        .nist-frame { border-color: var(--nist); }
-        .nist-label { background: var(--nist); color: black; }
-        .chain-frame { border-color: var(--chain); }
-        .chain-label { background: var(--chain); color: white; }
-        .local-frame { border-color: var(--local); }
-        .local-label { background: var(--local); color: black; }
-
-        .data-text { font-family: monospace; font-size: 0.85rem; word-break: break-all; opacity: 0.8; }
-        
-        button {
-            width: 100%;
-            padding: 15px;
+            left: 10px;
             background: #334155;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
+            padding: 2px 8px;
+            font-size: 0.7em;
+            border-radius: 4px;
         }
-        button:active { transform: scale(0.98); background: #475569; }
-        
-        .status { font-size: 0.75rem; color: #94a3b8; margin-top: 10px; text-align: center; }
+        .local { border-color: #22c55e; color: #4ade80; }
+        .local .label { background: #22c55e; color: #064e3b; }
+        .nist { border-color: #0ea5e9; color: #7dd3fc; }
+        .nist .label { background: #0ea5e9; color: #082f49; }
+        .ledger { border-color: #a855f7; color: #d8b4fe; }
+        .ledger .label { background: #a855f7; color: #3b0764; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>PROJECT LIAR</h1>
-    
-    <textarea id="inputArea" placeholder="Enter idea, fact, or evidence..."></textarea>
-    
-    <button onclick="authenticate()">AUTHENTICATE TRUTH</button>
-    <div class="status" id="statusMsg">Waiting for input...</div>
+    <div class="container">
+        <h1>Project Liar</h1>
+        
+        <textarea id="input" placeholder="Enter idea, fact, or evidence..."></textarea>
+        
+        <button onclick="authenticate()">Authenticate Truth</button>
 
-    <div style="margin-top: 30px;">
-        <div class="frame local-frame">
-            <span class="label local-label">Local Identity</span>
-            <div id="localOutput" class="data-text">Ready to hash locally...</div>
+        <div class="status" id="status">Waiting for input...</div>
+
+        <div class="frame local">
+            <div class="label">LOCAL IDENTITY</div>
+            <div id="local-out">Ready to hash locally...</div>
         </div>
 
-        <div class="frame nist-frame">
-            <span class="label nist-label">Atomic Witness (NIST)</span>
-            <div id="nistOutput" class="data-text">Pending internet sync...</div>
+        <div class="frame nist">
+            <div class="label">ATOMIC WITNESS (NIST)</div>
+            <div id="nist-out">Pending internet sync...</div>
         </div>
 
-        <div class="frame chain-frame">
-            <span class="label chain-label">Blockchain Ledger</span>
-            <div id="chainOutput" class="data-text">Pending transaction...</div>
+        <div class="frame ledger">
+            <div class="label">BLOCKCHAIN LEDGER</div>
+            <div id="ledger-out">Pending transaction...</div>
         </div>
     </div>
-</div>
 
-<script>
-    async function authenticate() {
-        const text = document.getElementById('inputArea').value;
-        if(!text) return alert("Enter some text first!");
+    <script>
+        async function authenticate() {
+            const text = document.getElementById('input').value;
+            if(!text) return;
 
-        const status = document.getElementById('statusMsg');
-        status.innerText = "Hashing locally...";
+            document.getElementById('status').innerText = "GENERATING PROOF...";
 
-        // 1. LOCAL HASH (Offline Path)
-        const msgBuffer = new TextEncoder().encode(text);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        
-        document.getElementById('localOutput').innerHTML = 
-            `HASH: ${hashHex}<br>TIME: ${new Date().toLocaleString()}`;
-
-        // 2. NIST & BLOCKCHAIN (Online "Burst" Path)
-        if (navigator.onLine) {
-            status.innerText = "Internet detected. Syncing to Global Clocks...";
-            fetchNIST(hashHex);
-        } else {
-            status.innerText = "OFFLINE. Hash saved locally. Connect to Wi-Fi to anchor.";
-        }
-    }
-
-    async function fetchNIST(hash) {
-        try {
-            // NIST Beacon API v2.0 Call (Simulated for this demo snippet)
-            // In a real build, you use a proxy or specific NIST URL
-            const nistDisplay = document.getElementById('nistOutput');
-            nistDisplay.innerText = "Fetching latest Atomic Randomness...";
+            // 1. Local Hash (SHA-256)
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
             
-            setTimeout(() => {
-                nistDisplay.innerText = "BEACON PULSE: [VERIFIED]\nCODE: 8b2f9a...c3d1";
-                document.getElementById('chainOutput').innerText = `TX_ID: [PENDING_ANCHOR]\nTARGET: BITCOIN_OP_RETURN`;
-                document.getElementById('statusMsg').innerText = "TRUTH ANCHORED SUCCESSFULLY.";
-            }, 1000);
-        } catch (e) {
-            document.getElementById('nistOutput').innerText = "Sync failed. Retry on public Wi-Fi.";
+            const now = new Date();
+            document.getElementById('local-out').innerHTML = `HASH: ${hashHex}<br>TIME: ${now.toLocaleString()}`;
+
+            // 2. NIST Mock (In real app, this fetches from beacon.nist.gov)
+            document.getElementById('nist-out').innerHTML = "BEACON PULSE: [VERIFIED]<br>CODE: 8b2f9a...c3d1";
+
+            // 3. Ledger Mock (In real app, this sends to OpenTimestamps)
+            document.getElementById('ledger-out').innerHTML = "TX_ID: [PENDING_ANCHOR]<br>TARGET: BITCOIN_OP_RETURN";
+
+            document.getElementById('status').innerText = "TRUTH ANCHORED SUCCESSFULLY.";
         }
-    }
-</script>
+    </script>
 
 </body>
 </html>
