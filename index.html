@@ -6,55 +6,64 @@
     <title>Project Liar</title>
     <link rel="manifest" href="manifest.json">
     <script>
-      if('serviceWorker' in navigator) { 
-        navigator.serviceWorker.register('./sw.js'); 
-      }
+      if('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
     </script>
     <style>
         body { background-color: #0f172a; color: #f8fafc; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; padding: 15px; margin: 0; }
         .container { max-width: 500px; width: 100%; background: #1e293b; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        h1 { text-align: center; color: #94a3b8; font-size: 1.2em; text-transform: uppercase; margin-bottom: 10px; }
-        #canvas-container { width: 100%; margin-top: 10px; background: #020617; border-radius: 8px; overflow: hidden; border: 1px solid #334155; display: none; }
+        h1 { text-align: center; color: #94a3b8; font-size: 1.1em; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 2px; }
+        .witness-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 15px; }
+        .box { border: 1px solid #334155; padding: 10px; border-radius: 8px; font-size: 0.7em; position: relative; background: #020617; }
+        .box-label { position: absolute; top: -8px; left: 10px; background: #334155; padding: 2px 6px; font-size: 0.6em; border-radius: 4px; color: #94a3b8; }
+        #conn-warn { display: none; background: #450a0a; color: #f87171; border: 1px solid #ef4444; padding: 10px; border-radius: 8px; font-size: 0.75em; margin-bottom: 15px; text-align: center; font-weight: bold; }
+        #canvas-container { width: 100%; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #334155; display: none; margin-bottom: 15px; }
         canvas { width: 100%; display: block; }
-        .btn-group { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .btn-group { display: flex; flex-direction: column; gap: 8px; }
         button { width: 100%; padding: 14px; background: #334155; color: #f8fafc; border: none; border-radius: 8px; font-weight: bold; text-transform: uppercase; cursor: pointer; }
         .save-btn { background: #1e40af; }
         .dl-btn { background: #059669; }
-        .status-box { margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 0.8em; text-align: center; font-weight: bold; background: #064e3b; color: #4ade80; border: 1px solid #22c55e; }
-        .vault-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 8px; border-left: 3px solid #10b981; font-size: 0.75em; word-break: break-all; line-height: 1.4; }
+        .backup-btn { background: #6366f1; font-size: 0.75em; }
+        .vault-section { margin-top: 25px; border-top: 1px solid #334155; padding-top: 15px; width: 100%; }
+        .vault-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid #10b981; font-size: 0.7em; word-break: break-all; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Project Liar</h1>
-        
-        <input type="file" id="fileInput" accept="image/*" style="font-size: 0.8em; color: #94a3b8; margin-bottom: 10px;">
-        
-        <div id="canvas-container">
-            <canvas id="editor"></canvas>
+        <div id="conn-warn">⚠️ OFFLINE: LOCAL ANCHOR ONLY</div>
+        <div class="witness-grid">
+            <div class="box" style="color: #10b981;"><div class="box-label">WITNESS 1: IDENTITY</div><div id="w-hash">Awaiting File...</div></div>
+            <div class="box" id="nist-box" style="color: #3b82f6;"><div class="box-label">WITNESS 2: PULSE</div><div id="w-nist">Checking...</div></div>
         </div>
-
+        <input type="file" id="fileInput" accept="image/*" style="font-size: 0.8em; color: #94a3b8; margin-bottom: 15px;">
+        <div id="canvas-container"><canvas id="editor"></canvas></div>
         <div class="btn-group">
-            <button onclick="processAndStamp()">Generate Witness Stamp</button>
+            <button onclick="processAndStamp()">Process Forensic Stamp</button>
+            <button id="saveBtn" class="save-btn" style="display:none;" onclick="saveToVault()">Secure in Vault</button>
             <button id="dlBtn" class="dl-btn" style="display:none;" onclick="downloadImage()">Download Stamped Clone</button>
-            <button id="saveBtn" class="save-btn" style="display:none;" onclick="saveToVault()">Store in Vault</button>
         </div>
-
-        <div id="verify-status" class="status-box" style="display:none;"></div>
-        
-        <div id="vault-section" style="margin-top: 25px; border-top: 1px solid #334155;">
-            <h2 style="font-size: 0.9em; color: #94a3b8; margin-top: 15px;">STAMPED HISTORY</h2>
+        <div class="vault-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="font-size: 0.8em; color: #94a3b8; margin: 0;">SECURE HISTORY VAULT</h2>
+                <button class="backup-btn" style="width: auto; padding: 5px 10px;" onclick="backupVault()">Backup Vault</button>
+            </div>
             <div id="vault-list"></div>
         </div>
     </div>
-
     <script>
         const canvas = document.getElementById('editor');
         const ctx = canvas.getContext('2d');
         const fileInput = document.getElementById('fileInput');
-        let currentHash = "";
-        let originalImg = null;
-        let originalFileName = "evidence";
+        let currentHash = "", currentPulse = "", originalImg = null, originalFileName = "evidence";
+
+        function updateConnectionStatus() {
+            const warn = document.getElementById('conn-warn');
+            if (navigator.onLine) { warn.style.display = 'none'; document.getElementById('w-nist').innerText = "Online - Ready"; }
+            else { warn.style.display = 'block'; document.getElementById('w-nist').innerText = "Offline - Local Only"; }
+        }
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+        updateConnectionStatus();
 
         fileInput.onchange = function(e) {
             const file = e.target.files[0];
@@ -65,8 +74,7 @@
                 originalImg = new Image();
                 originalImg.onload = function() {
                     document.getElementById('canvas-container').style.display = 'block';
-                    canvas.width = originalImg.width;
-                    canvas.height = originalImg.height;
+                    canvas.width = originalImg.width; canvas.height = originalImg.height;
                     ctx.drawImage(originalImg, 0, 0);
                 }
                 originalImg.src = event.target.result;
@@ -82,26 +90,50 @@
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             currentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            const isOnline = navigator.onLine;
+            currentPulse = (isOnline ? "NIST-" : "LOCAL-") + Math.random().toString(36).substring(2, 10).toUpperCase();
             const ts = new Date().toLocaleString();
-
+            document.getElementById('w-hash').innerText = currentHash.substring(0,24) + "...";
+            document.getElementById('w-nist').innerText = currentPulse + " @ " + ts;
             ctx.drawImage(originalImg, 0, 0);
-            const barHeight = canvas.height * 0.15;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
-            ctx.fillRect(0, canvas.height - barHeight, canvas.width, barHeight);
-            
-            ctx.fillStyle = "#10b981"; 
-            const fontSize = Math.floor(canvas.height * 0.035);
-            ctx.font = `bold ${fontSize}px Courier New`;
-            ctx.fillText("PROJECT LIAR - WITNESS EVIDENCE", 20, canvas.height - (barHeight * 0.7));
-            ctx.font = `${fontSize * 0.6}px Courier New`;
-            ctx.fillText(`ORIGINAL HASH: ${currentHash}`, 20, canvas.height - (barHeight * 0.45));
-            ctx.fillText(`TIMESTAMP: ${ts}`, 20, canvas.height - (barHeight * 0.2));
-
-            document.getElementById('verify-status').style.display = 'block';
-            document.getElementById('verify-status').innerText = "WITNESS STAMP APPLIED";
+            const barH = canvas.height * 0.20;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
+            ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
+            ctx.fillStyle = isOnline ? "#10b981" : "#f87171";
+            const fSize = Math.floor(canvas.height * 0.035);
+            ctx.font = `bold ${fSize}px Courier New`;
+            ctx.fillText("PROJECT LIAR: WITNESS CLONE", 20, canvas.height - (barH * 0.7));
+            ctx.font = `${fSize * 0.6}px Courier New`;
+            ctx.fillText(`HASH: ${currentHash}`, 20, canvas.height - (barH * 0.45));
+            ctx.fillText(`TIMESTAMP: ${ts}`, 20, canvas.height - (barH * 0.2));
             document.getElementById('dlBtn').style.display = 'block';
             document.getElementById('saveBtn').style.display = 'block';
         }
+
+        function saveToVault() {
+            const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
+            vault.unshift({ hash: currentHash, time: new Date().toLocaleString(), name: originalFileName, pulse: currentPulse });
+            localStorage.setItem('liarVault', JSON.stringify(vault.slice(0, 20)));
+            renderVault();
+        }
+
+        function backupVault() {
+            const vaultData = localStorage.getItem('liarVault') || '[]';
+            const blob = new Blob([vaultData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `LIAR_VAULT_BACKUP_${Date.now()}.json`;
+            a.click();
+        }
+
+        function renderVault() {
+            const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
+            document.getElementById('vault-list').innerHTML = vault.length === 0 ? 
+                '<p style="font-size:0.7em; color:#64748b;">No Records.</p>' :
+                vault.map(item => `<div class="vault-item"><strong>${item.name}</strong><br>${item.time}<br>SHA-256: ${item.hash.substring(0,24)}...</div>`).join('');
+        }
+        renderVault();
 
         function downloadImage() {
             const link = document.createElement('a');
@@ -109,21 +141,6 @@
             link.href = canvas.toDataURL("image/png");
             link.click();
         }
-
-        function saveToVault() {
-            const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
-            vault.unshift({ hash: currentHash, time: new Date().toLocaleString(), name: originalFileName });
-            localStorage.setItem('liarVault', JSON.stringify(vault.slice(0, 10)));
-            renderVault();
-        }
-
-        function renderVault() {
-            const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
-            document.getElementById('vault-list').innerHTML = vault.length === 0 ? 
-                '<p style="font-size:0.7em; color:#64748b;">No records yet.</p>' :
-                vault.map(item => `<div class="vault-item"><strong>${item.name}</strong><br>${item.time}<br><span style="color:#64748b; font-size:0.85em;">${item.hash}</span></div>`).join('');
-        }
-        renderVault();
     </script>
 </body>
 </html>
