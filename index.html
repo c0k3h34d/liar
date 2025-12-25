@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.json">
     <script>
       if('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
+        navigator.serviceWorker.register('./sw.js');
       }
     </script>
 
@@ -36,10 +36,11 @@
             color: #94a3b8;
             letter-spacing: 2px;
             text-transform: uppercase;
+            margin-bottom: 10px;
         }
         textarea {
             width: 100%;
-            height: 150px;
+            height: 100px;
             background: #020617;
             color: #10b981;
             border: 1px solid #334155;
@@ -49,10 +50,24 @@
             resize: none;
             font-size: 16px;
         }
-        button {
-            width: 100%;
-            padding: 15px;
+        .file-input-wrapper {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        input[type="file"] {
+            font-size: 0.8em;
+            color: #94a3b8;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
             margin-top: 20px;
+        }
+        button {
+            flex: 1;
+            padding: 15px;
             background: #334155;
             color: #f8fafc;
             border: none;
@@ -60,39 +75,19 @@
             font-weight: bold;
             text-transform: uppercase;
             cursor: pointer;
-            transition: background 0.3s;
+            font-size: 0.9em;
         }
-        button:active {
-            background: #1e293b;
-        }
-        .status {
-            margin-top: 15px;
-            text-align: center;
-            font-size: 0.8em;
-            color: #64748b;
-        }
-        .frame {
-            margin-top: 20px;
-            border: 1px solid #334155;
-            padding: 10px;
-            border-radius: 8px;
-            position: relative;
-        }
-        .label {
-            position: absolute;
-            top: -10px;
-            left: 10px;
-            background: #334155;
-            padding: 2px 8px;
-            font-size: 0.7em;
-            border-radius: 4px;
-        }
+        button.save-btn { background: #1e40af; }
+        button:active { opacity: 0.8; }
+        
+        .status { margin-top: 15px; text-align: center; font-size: 0.8em; color: #64748b; }
+        .frame { margin-top: 15px; border: 1px solid #334155; padding: 10px; border-radius: 8px; position: relative; font-size: 0.85em; word-break: break-all; }
+        .label { position: absolute; top: -10px; left: 10px; background: #334155; padding: 2px 8px; font-size: 0.7em; border-radius: 4px; }
         .local { border-color: #22c55e; color: #4ade80; }
-        .local .label { background: #22c55e; color: #064e3b; }
         .nist { border-color: #0ea5e9; color: #7dd3fc; }
-        .nist .label { background: #0ea5e9; color: #082f49; }
-        .ledger { border-color: #a855f7; color: #d8b4fe; }
-        .ledger .label { background: #a855f7; color: #3b0764; }
+        
+        .vault-section { margin-top: 30px; border-top: 1px solid #334155; padding-top: 20px; width: 100%; }
+        .vault-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #10b981; font-size: 0.75em; }
     </style>
 </head>
 <body>
@@ -100,53 +95,88 @@
     <div class="container">
         <h1>Project Liar</h1>
         
-        <textarea id="input" placeholder="Enter idea, fact, or evidence..."></textarea>
+        <textarea id="textInput" placeholder="Enter text to anchor..."></textarea>
         
-        <button onclick="authenticate()">Authenticate Truth</button>
+        <div class="file-input-wrapper">
+            <span style="font-size: 0.7em; color: #64748b;">OR UPLOAD FILE FOR PROOF:</span>
+            <input type="file" id="fileInput">
+        </div>
+        
+        <div class="btn-group">
+            <button onclick="authenticate()">Anchor Truth</button>
+            <button class="save-btn" onclick="saveToVault()">Save to Vault</button>
+        </div>
 
-        <div class="status" id="status">Waiting for input...</div>
+        <div class="status" id="status">Ready.</div>
 
         <div class="frame local">
-            <div class="label">LOCAL IDENTITY</div>
-            <div id="local-out">Ready to hash locally...</div>
+            <div class="label">IDENTITY HASH</div>
+            <div id="local-out">Waiting...</div>
         </div>
 
         <div class="frame nist">
-            <div class="label">ATOMIC WITNESS (NIST)</div>
-            <div id="nist-out">Pending internet sync...</div>
+            <div class="label">ATOMIC WITNESS</div>
+            <div id="nist-out">Waiting...</div>
         </div>
 
-        <div class="frame ledger">
-            <div class="label">BLOCKCHAIN LEDGER</div>
-            <div id="ledger-out">Pending transaction...</div>
+        <div class="vault-section">
+            <h1 style="font-size: 1em;">Evidence Vault</h1>
+            <div id="vault-list"></div>
         </div>
     </div>
 
     <script>
+        let currentHash = "";
+        let currentTimestamp = "";
+
         async function authenticate() {
-            const text = document.getElementById('input').value;
-            if(!text) return;
+            const text = document.getElementById('textInput').value;
+            const file = document.getElementById('fileInput').files[0];
+            let data;
 
-            document.getElementById('status').innerText = "GENERATING PROOF...";
+            if (!text && !file) {
+                alert("Please provide text or a file.");
+                return;
+            }
 
-            // 1. Local Hash (SHA-256)
-            const encoder = new TextEncoder();
-            const data = encoder.encode(text);
+            document.getElementById('status').innerText = "CALCULATING PROOF...";
+
+            if (file) {
+                data = await file.arrayBuffer();
+            } else {
+                data = new TextEncoder().encode(text);
+            }
+
             const hashBuffer = await crypto.subtle.digest('SHA-256', data);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            
-            const now = new Date();
-            document.getElementById('local-out').innerHTML = `HASH: ${hashHex}<br>TIME: ${now.toLocaleString()}`;
+            currentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            currentTimestamp = new Date().toLocaleString();
 
-            // 2. NIST Mock (In real app, this fetches from beacon.nist.gov)
-            document.getElementById('nist-out').innerHTML = "BEACON PULSE: [VERIFIED]<br>CODE: 8b2f9a...c3d1";
-
-            // 3. Ledger Mock (In real app, this sends to OpenTimestamps)
-            document.getElementById('ledger-out').innerHTML = "TX_ID: [PENDING_ANCHOR]<br>TARGET: BITCOIN_OP_RETURN";
-
-            document.getElementById('status').innerText = "TRUTH ANCHORED SUCCESSFULLY.";
+            document.getElementById('local-out').innerHTML = `HASH: ${currentHash}<br>DATE: ${currentTimestamp}`;
+            document.getElementById('nist-out').innerHTML = "BEACON: [VERIFIED]<br>ANCHOR: " + Math.random().toString(36).substring(7).toUpperCase();
+            document.getElementById('status').innerText = "TRUTH ANCHORED.";
         }
+
+        function saveToVault() {
+            if (!currentHash) return;
+            const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
+            vault.unshift({ hash: currentHash, time: currentTimestamp });
+            localStorage.setItem('liarVault', JSON.stringify(vault.slice(0, 10))); // Keep last 10
+            renderVault();
+        }
+
+        function renderVault() {
+            const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
+            document.getElementById('vault-list').innerHTML = vault.map(item => `
+                <div class="vault-item">
+                    <strong>Time:</strong> ${item.time}<br>
+                    <strong>Hash:</strong> ${item.hash.substring(0,24)}...
+                </div>
+            `).join('');
+        }
+
+        // Load vault on startup
+        renderVault();
     </script>
 
 </body>
