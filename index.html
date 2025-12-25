@@ -6,7 +6,9 @@
     <title>Project Liar</title>
     <link rel="manifest" href="manifest.json">
     <script>
-      if('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
+      if('serviceWorker' in navigator) { 
+        navigator.serviceWorker.register('./sw.js'); 
+      }
     </script>
     <style>
         body { background-color: #0f172a; color: #f8fafc; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; padding: 15px; margin: 0; }
@@ -19,14 +21,14 @@
         .save-btn { background: #1e40af; }
         .dl-btn { background: #059669; }
         .status-box { margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 0.8em; text-align: center; font-weight: bold; background: #064e3b; color: #4ade80; border: 1px solid #22c55e; }
-        .vault-item { background: #0f172a; padding: 8px; border-radius: 6px; margin-top: 8px; border-left: 3px solid #10b981; font-size: 0.7em; }
+        .vault-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 8px; border-left: 3px solid #10b981; font-size: 0.75em; word-break: break-all; line-height: 1.4; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Project Liar</h1>
         
-        <input type="file" id="fileInput" accept="image/*" style="font-size: 0.8em; color: #94a3b8;">
+        <input type="file" id="fileInput" accept="image/*" style="font-size: 0.8em; color: #94a3b8; margin-bottom: 10px;">
         
         <div id="canvas-container">
             <canvas id="editor"></canvas>
@@ -39,7 +41,11 @@
         </div>
 
         <div id="verify-status" class="status-box" style="display:none;"></div>
-        <div id="vault-list" style="margin-top: 20px;"></div>
+        
+        <div id="vault-section" style="margin-top: 25px; border-top: 1px solid #334155;">
+            <h2 style="font-size: 0.9em; color: #94a3b8; margin-top: 15px;">STAMPED HISTORY</h2>
+            <div id="vault-list"></div>
+        </div>
     </div>
 
     <script>
@@ -53,10 +59,7 @@
         fileInput.onchange = function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            
-            // Capture the original name and remove the extension
             originalFileName = file.name.replace(/\.[^/.]+$/, "");
-            
             const reader = new FileReader();
             reader.onload = function(event) {
                 originalImg = new Image();
@@ -73,7 +76,6 @@
 
         async function processAndStamp() {
             if(!originalImg) return;
-            
             const response = await fetch(originalImg.src);
             const blob = await response.blob();
             const arrayBuffer = await blob.arrayBuffer();
@@ -83,21 +85,17 @@
             const ts = new Date().toLocaleString();
 
             ctx.drawImage(originalImg, 0, 0);
-            
-            // Visual Stamp Background
-            const barHeight = canvas.height * 0.12;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+            const barHeight = canvas.height * 0.15;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
             ctx.fillRect(0, canvas.height - barHeight, canvas.width, barHeight);
             
-            // Text Styles
             ctx.fillStyle = "#10b981"; 
-            const fontSize = Math.floor(canvas.height * 0.03);
+            const fontSize = Math.floor(canvas.height * 0.035);
             ctx.font = `bold ${fontSize}px Courier New`;
-            
-            ctx.fillText("PROJECT LIAR - WITNESS EVIDENCE", 20, canvas.height - (barHeight * 0.65));
+            ctx.fillText("PROJECT LIAR - WITNESS EVIDENCE", 20, canvas.height - (barHeight * 0.7));
             ctx.font = `${fontSize * 0.6}px Courier New`;
-            ctx.fillText(`ORIGINAL HASH: ${currentHash}`, 20, canvas.height - (barHeight * 0.4));
-            ctx.fillText(`TIMESTAMP: ${ts}`, 20, canvas.height - (barHeight * 0.15));
+            ctx.fillText(`ORIGINAL HASH: ${currentHash}`, 20, canvas.height - (barHeight * 0.45));
+            ctx.fillText(`TIMESTAMP: ${ts}`, 20, canvas.height - (barHeight * 0.2));
 
             document.getElementById('verify-status').style.display = 'block';
             document.getElementById('verify-status').innerText = "WITNESS STAMP APPLIED";
@@ -107,7 +105,6 @@
 
         function downloadImage() {
             const link = document.createElement('a');
-            // Adding the tag to the file name as requested
             link.download = `${originalFileName}_WITNESS_STAMPED.png`;
             link.href = canvas.toDataURL("image/png");
             link.click();
@@ -122,8 +119,9 @@
 
         function renderVault() {
             const vault = JSON.parse(localStorage.getItem('liarVault') || '[]');
-            document.getElementById('vault-list').innerHTML = '<h1 style="font-size:0.8em;">STAMPED HISTORY</h1>' + 
-                vault.map(item => `<div class="vault-item"><strong>${item.name}</strong><br>${item.time}<br><span style="color:#64748b; font-size:0.8em;">${item.hash.substring(0,32)}...</span></div>`).join('');
+            document.getElementById('vault-list').innerHTML = vault.length === 0 ? 
+                '<p style="font-size:0.7em; color:#64748b;">No records yet.</p>' :
+                vault.map(item => `<div class="vault-item"><strong>${item.name}</strong><br>${item.time}<br><span style="color:#64748b; font-size:0.85em;">${item.hash}</span></div>`).join('');
         }
         renderVault();
     </script>
